@@ -1,5 +1,7 @@
 // ignore_for_file: prefer_const_constructors, prefer_const_literals_to_create_immutables
 import 'dart:convert';
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -7,6 +9,7 @@ import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:modal_bottom_sheet/modal_bottom_sheet.dart';
 import 'package:weather_app/components/weather_item.dart';
+import 'package:weather_app/ui/detailPage.dart';
 import 'package:weather_app/widgets/constants.dart';
 
 class homePage extends StatefulWidget{
@@ -32,11 +35,13 @@ class _HomePageState extends State<homePage>{
 
   List hourlyWeatherForecast=[];
   List dailyWeatherForecast=[];
+  
+  Map<String, dynamic> weatherData={};
 
 
   String currentWeatherStatus='';
 
-  String searchWeatherAPI="http://api.weatherapi.com/v1/current.json?key=" + API_KEY+ "&days=7&q=";
+  String searchWeatherAPI="http://api.weatherapi.com/v1/forecast.json?key=$API_KEY&days=7&aqi=no&alerts=no&q=";
 
   static String getShortLocationName(String s){
     List<String> wordList=s.split(" ");
@@ -52,33 +57,61 @@ class _HomePageState extends State<homePage>{
   }
 
   void fetchWeatherData(String searchText) async{
-    try{
-      var searchResult= await http.get(Uri.parse(searchWeatherAPI+searchText));
-      var weatherData=Map<String, dynamic>.from(json.decode(searchResult.body)??'No data');
-      var locationData=weatherData["location"];
-      var currentWeather=weatherData["current"];
+   try {
+    final response = await http.get(Uri.parse(searchWeatherAPI + searchText));
+    if (response.statusCode == 200) {
+      final Map<String, dynamic> data = json.decode(response.body);
 
       setState(() {
-        location=getShortLocationName(locationData["name"]);
-        var parsedDate=DateTime.parse(locationData["localtime"].substring(0, 10));
-        var newDate=DateFormat('MMMMEEEEd').format(parsedDate);
-        currentDate=newDate;
+        weatherData = data;
 
-        currentWeatherStatus=currentWeather["condition"]["text"];
-        weatherIcon=currentWeatherStatus.replaceAll(' ', '').toLowerCase()+".png";
-        temperature=currentWeather["temp_c"].toInt();
-        windSpeed=currentWeather["wind_kph"].toInt();
-        humidity=currentWeather["humidity"].toInt();
-        cloud=currentWeather["cloud"].toInt();
+        // Check and parse location data
+        var locationData = weatherData["location"];
+        if (locationData != null) {
+          location = getShortLocationName(locationData["name"]);
+          var parsedDate = DateTime.parse(locationData["localtime"].substring(0, 10));
+          currentDate = DateFormat('MMMMEEEEd').format(parsedDate);
+        }
 
-        dailyWeatherForecast=weatherData["forecast"]["forecastday"];
-        hourlyWeatherForecast=dailyWeatherForecast[0]["hour"];
-        //print(dailyWeatherForecast);
+        // Check and parse current weather data
+        var currentWeather = weatherData["current"];
+        if (currentWeather != null) {
+          currentWeatherStatus = currentWeather["condition"]["text"];
+          weatherIcon = currentWeatherStatus.replaceAll(' ', '').toLowerCase() + ".png";
+          temperature = currentWeather["temp_c"].toInt();
+          windSpeed = currentWeather["wind_kph"].toInt();
+          humidity = currentWeather["humidity"].toInt();
+          cloud = currentWeather["cloud"].toInt();
+        }
+
+        // Check and parse forecast data
+        var forecastData = weatherData["forecast"];
+        if (forecastData != null) {
+          //print('Forecast data: $forecastData'); // Print the forecast data
+          var forecastDays = forecastData["forecastday"];
+          if (forecastDays != null) {
+            //print('Forecast days data: $forecastDays'); // Print the forecast days data
+            dailyWeatherForecast = forecastDays;
+            if (dailyWeatherForecast.isNotEmpty) {
+              hourlyWeatherForecast = dailyWeatherForecast[0]["hour"];
+            }
+          } else {
+            //print('forecastday is null or empty');
+            dailyWeatherForecast = [];
+            hourlyWeatherForecast = [];
+          }
+        } else {
+          //print('Forecast data is not available.');
+          dailyWeatherForecast = [];
+          hourlyWeatherForecast = [];
+        }
       });
+    } else {
+      //print('Failed to load weather data: ${response.statusCode}');
     }
-    catch(e){
-      //print(e);
-    }
+  } catch (e) {
+    print('Error fetching weather data: $e');
+  }
   }
 
   
@@ -240,7 +273,8 @@ class _HomePageState extends State<homePage>{
                     children: [
                       Text('Today', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),),
                       GestureDetector(
-                        onTap: (){},
+                        onTap: ()=>Navigator.push(context, 
+                        MaterialPageRoute(builder: (_)=>Detailpage(dailyForecastWeather: dailyWeatherForecast,))),
                         child: Text('Forecasts', 
                         style: TextStyle(fontSize: 20, 
                         color: _constants.primaryColor, 
@@ -249,60 +283,60 @@ class _HomePageState extends State<homePage>{
                     ],
                   ),
                   const SizedBox(height: 8,),
-                  ElevatedButton(onPressed: (){print(dailyWeatherForecast);}, child: Text("click"))
-                  // SizedBox(
-                  //   height: 110,
-                  //   child: ListView.builder(
-                  //     itemCount: hourlyWeatherForecast.length,
-                  //     scrollDirection: Axis.horizontal,
-                  //     physics: const BouncingScrollPhysics(),
-                  //     itemBuilder: (BuildContext context, int index){
-                  //       String currentTime = DateFormat('HH:mm:ss').format(DateTime.now());
-                  //       String currentHour=currentTime.substring(0,2);
-                  //       String forecastTime=hourlyWeatherForecast[index]["time"].substring(11, 16);
-                  //       String forecastHour=hourlyWeatherForecast[index]["time"].substring(11, 13);
-                  //       String forecastWeatherName=hourlyWeatherForecast[index]["condition"]["text"];
-                  //       String forecastWeatherIcon=forecastWeatherName.replaceAll(' ', '').toLowerCase()+".png";
-                  //       String forecastTemperature=hourlyWeatherForecast[index]["temp_c"].round().toString();
+                  // ElevatedButton(onPressed: (){print("");}, child: Text("click"))
+                  SizedBox(
+                    height: 110,
+                    child: ListView.builder(
+                      itemCount: hourlyWeatherForecast.length,
+                      scrollDirection: Axis.horizontal,
+                      physics: const BouncingScrollPhysics(),
+                      itemBuilder: (BuildContext context, int index){
+                        String currentTime = DateFormat('HH:mm:ss').format(DateTime.now());
+                        String currentHour=currentTime.substring(0,2);
+                        String forecastTime=hourlyWeatherForecast[index]["time"].substring(11, 16);
+                        String forecastHour=hourlyWeatherForecast[index]["time"].substring(11, 13);
+                        String forecastWeatherName=hourlyWeatherForecast[index]["condition"]["text"];
+                        String forecastWeatherIcon=forecastWeatherName.replaceAll(' ', '').toLowerCase()+".png";
+                        String forecastTemperature=hourlyWeatherForecast[index]["temp_c"].round().toString();
                         
-                  //       return Container(
-                  //         padding: const EdgeInsets.symmetric(vertical: 15),
-                  //         margin: const EdgeInsets.only(right:20), 
-                  //         width:65,
-                  //         decoration: BoxDecoration(
-                  //           color: currentHour==forecastHour?Colors.white70:_constants.primaryColor,
-                  //           borderRadius: const BorderRadius.all(Radius.circular(50)),
-                  //           boxShadow: [
-                  //             BoxShadow(
-                  //               offset: const Offset(0, 1),
-                  //               blurRadius: 5,
-                  //               color: _constants.primaryColor.withOpacity(.2),
-                  //             )
-                  //           ]),
-                  //           child: Column(
-                  //             mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  //             children: [
-                  //               Text(forecastTime, style: TextStyle(fontSize: 17, color: _constants.greyColor, fontWeight: FontWeight.bold),),
-                  //               Image.asset('assets/images/$forecastWeatherIcon', width: 20,),
-                  //               Row(
-                  //                 mainAxisAlignment: MainAxisAlignment.center,
-                  //                 crossAxisAlignment: CrossAxisAlignment.start,
-                  //                 children: [
+                        return Container(
+                          padding: const EdgeInsets.symmetric(vertical: 15),
+                          margin: const EdgeInsets.only(right:20), 
+                          width:65,
+                          decoration: BoxDecoration(
+                            color: currentHour==forecastHour?Colors.white70:_constants.primaryColor,
+                            borderRadius: const BorderRadius.all(Radius.circular(50)),
+                            boxShadow: [
+                              BoxShadow(
+                                offset: const Offset(0, 1),
+                                blurRadius: 5,
+                                color: _constants.primaryColor.withOpacity(.2),
+                              )
+                            ]),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(forecastTime, style: TextStyle(fontSize: 17, color: _constants.greyColor, fontWeight: FontWeight.bold),),
+                                Image.asset('assets/images/$forecastWeatherIcon', width: 20,),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
                                    
-                  //                   Padding(
-                  //                     padding: const EdgeInsets.only(top:8),
-                  //                     child: Text(forecastTemperature, style: TextStyle(fontSize: 17, foreground: Paint()..shader=_constants.shader, fontWeight: FontWeight.bold),)),
-                  //                   Text('o', style: TextStyle(fontSize: 16, foreground: Paint()..shader=_constants.shader, fontWeight: FontWeight.bold),),
-                  //                 ],
-                  //               )
-                  //             ],
+                                    Padding(
+                                      padding: const EdgeInsets.only(top:8),
+                                      child: Text(forecastTemperature, style: TextStyle(fontSize: 17, foreground: Paint()..shader=_constants.shader, fontWeight: FontWeight.bold),)),
+                                    Text('o', style: TextStyle(fontSize: 16, foreground: Paint()..shader=_constants.shader, fontWeight: FontWeight.bold),),
+                                  ],
+                                )
+                              ],
 
-                  //           ),
-                  //       );
+                            ),
+                        );
 
-                  //     },
-                  //   ),
-                  // )
+                      },
+                    ),
+                  )
                 ],
               )
             )

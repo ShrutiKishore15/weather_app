@@ -20,9 +20,9 @@ class Constants{
   );
 
   final linearGradientTeal= const LinearGradient(
-    begin:Alignment.bottomRight,
-    end: Alignment.topLeft,
-    colors: <Color>[Color.fromARGB(255, 137, 226, 224), Color.fromARGB(255, 37, 123, 123)],
+    begin:Alignment.topLeft,
+    end: Alignment.center,
+    colors: <Color>[Color.fromARGB(255, 201, 236, 236), Color.fromARGB(255, 29, 121, 121)],
     stops: [0.0, 1.0]
   );
 
